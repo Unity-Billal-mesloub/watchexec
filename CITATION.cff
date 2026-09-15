@@ -6,7 +6,7 @@ title: "Watchexec: a tool to react to filesystem changes, and a crate ecosystem 
 version: "2.7.3"
 date-released: 2026-09-15
 
-repository-code: https://github.com/watchexec/watchexec
+repository-code: https://github.com/Unity-Billal-mesloub/watchexec
 license: Apache-2.0
 
 authors:
