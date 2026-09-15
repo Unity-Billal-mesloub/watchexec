@@ -1,6 +1,6 @@
 [package]
 name = "watchexec"
-version = "8.0.1"
+version = "8.4.2"
 
 authors = ["Félix Saparelli <felix@passcod.name>", "Matt Green <mattgreenrocks@gmail.com>"]
 license = "Apache-2.0"
@@ -20,20 +20,20 @@ async-priority-channel = "0.2.0"
 atomic-take = "1.0.0"
 futures = "0.3.29"
 miette = "7.2.0"
-notify = "8.0.0"
+notify = "8.2.0"
 thiserror = "2.0.11"
 normalize-path = "0.2.0"
 
 [dependencies.watchexec-events]
-version = "6.0.0"
+version = "6.1.2"
 path = "../events"
 
 [dependencies.watchexec-signals]
-version = "5.0.1"
+version = "5.1.1"
 path = "../signals"
 
 [dependencies.watchexec-supervisor]
-version = "5.0.2"
+version = "5.4.0"
 path = "../supervisor"
 
 [dependencies.tokio]
@@ -52,12 +52,23 @@ features = [
 version = "0.1.40"
 features = ["log"]
 
+[target.'cfg(unix)'.dependencies]
+libc = "0.2.74"
+
+[target.'cfg(windows)'.dependencies.windows-sys]
+version = ">= 0.59.0, < 0.62.0"
+features = ["Win32_System_Console", "Win32_Foundation"]
+
+[dev-dependencies]
+tempfile = "3.16.0"
+tokio = { version = "1.33.0", features = ["macros", "time"] }
+
 [dev-dependencies.tracing-subscriber]
 version = "0.3.6"
 features = ["env-filter"]
 
 [target.'cfg(unix)'.dev-dependencies.nix]
-version = "0.30.1"
+version = "0.31.1"
 features = ["signal"]
 
 [lints.clippy]

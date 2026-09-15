@@ -125,8 +125,11 @@ async fn main() -> Result<()> {
     // now we change what the action does:
     let auto_restart_abort = auto_restart.abort_handle();
     wx.config.on_action(move |mut action| {
-        // if we get Ctrl-C on the Watchexec instance, we quit
-        if action.signals().any(|sig| sig == Signal::Interrupt) {
+        // if we get Ctrl-C or SIGTERM on the Watchexec instance, we quit
+        if action
+            .signals()
+            .any(|sig| matches!(sig, Signal::Interrupt | Signal::Terminate))
+        {
             eprintln!("[Quitting...]");
             auto_restart_abort.abort();
             action.quit_gracefully(Signal::ForceStop, Duration::ZERO);
@@ -200,8 +203,8 @@ There are also separate, standalone crates used to build Watchexec which you can
 - **[ClearScreen](https://docs.rs/clearscreen)** makes clearing the terminal screen in a
   cross-platform way easy by default, and provides advanced options to fit your usecase.
 
-- **[Command Group](https://docs.rs/command-group)** augments the std and tokio `Command` with
-  support for process groups, portable between Unix and Windows.
+- **[Process Wrap](https://docs.rs/process-wrap)** augments the std and tokio `Command` with
+  support for process groups, sessions, job objects, PTYs, portable between Unix and Windows.
 
 - **[Event types](https://docs.rs/watchexec-events)** contains the event types used by Watchexec,
   including the JSON format used for passing event data to child processes.

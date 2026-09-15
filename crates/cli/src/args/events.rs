@@ -1,7 +1,9 @@
 use std::{ffi::OsStr, path::PathBuf};
 
 use clap::{
-	builder::TypedValueParser, error::ErrorKind, Arg, Command, CommandFactory, Parser, ValueEnum,
+	builder::TypedValueParser,
+	error::{ContextKind, ContextValue, ErrorKind},
+	Arg, Command, CommandFactory, Parser, ValueEnum,
 };
 use miette::Result;
 
@@ -129,6 +131,35 @@ pub struct EventsArgs {
 		display_order = 191,
 	)]
 	pub stdin_quit: bool,
+
+	/// Respond to keypresses to quit, restart, stop, or pause
+	///
+	/// In interactive mode, Watchexec listens for keypresses and responds to them. Currently
+	/// supported keys are: 'r' to restart the command, 's' to stop the running command, 'p' to
+	/// toggle pausing the watch, and 'q' to quit. This requires a terminal (TTY) and puts stdin
+	/// into raw mode, so the child process will not receive stdin input.
+	#[arg(
+		long,
+		short = 'I',
+		help_heading = OPTSET_EVENTS,
+		display_order = 90,
+	)]
+	pub interactive: bool,
+
+	/// Exit when the command has an error
+	///
+	/// By default, Watchexec will continue to watch and re-run the command after the command
+	/// exits, regardless of its exit status. With this option, it will instead exit when the
+	/// command completes with any non-success exit status.
+	///
+	/// This is useful when running Watchexec in a process manager or container, where you want
+	/// the container to restart when the command fails rather than hang waiting for file changes.
+	#[arg(
+		long,
+		help_heading = OPTSET_EVENTS,
+		display_order = 91,
+	)]
+	pub exit_on_error: bool,
 
 	/// Wait until first change before running command
 	///
@@ -312,6 +343,15 @@ impl EventsArgs {
 				.exit();
 		}
 
+		if self.interactive && filtering.watch_file == Some(PathBuf::from("-")) {
+			super::Args::command()
+				.error(
+					ErrorKind::InvalidValue,
+					"interactive mode cannot be used when --watch-file=-",
+				)
+				.exit();
+		}
+
 		Ok(())
 	}
 }
@@ -350,28 +390,116 @@ impl TypedValueParser for SignalMappingValueParser {
 
 	fn parse_ref(
 		&self,
-		_cmd: &Command,
-		_arg: Option<&Arg>,
+		cmd: &Command,
+		arg: Option<&Arg>,
 		value: &OsStr,
 	) -> Result<Self::Value, clap::error::Error> {
-		let value = value
-			.to_str()
-			.ok_or_else(|| clap::error::Error::raw(ErrorKind::ValueValidation, "invalid UTF-8"))?;
-		let (from, to) = value
-			.split_once(':')
-			.ok_or_else(|| clap::error::Error::raw(ErrorKind::ValueValidation, "missing ':'"))?;
+		let invalid = |reason: String| invalid_signal_mapping(cmd, arg, value, reason);
 
-		let from = from
-			.parse::<Signal>()
-			.map_err(|sigparse| clap::error::Error::raw(ErrorKind::ValueValidation, sigparse))?;
+		let string = value
+			.to_str()
+			.ok_or_else(|| invalid("value is not valid UTF-8".into()))?;
+		let (from, to) = string.split_once(':').ok_or_else(|| {
+			invalid("missing ':' separator between the received and sent signals".into())
+		})?;
+
+		let from = from.parse::<Signal>().map_err(|sigparse| {
+			invalid(format!("invalid signal to map from ('{from}'): {sigparse}"))
+		})?;
 		let to = if to.is_empty() {
 			None
 		} else {
 			Some(to.parse::<Signal>().map_err(|sigparse| {
-				clap::error::Error::raw(ErrorKind::ValueValidation, sigparse)
+				invalid(format!("invalid signal to map to ('{to}'): {sigparse}"))
 			})?)
 		};
 
 		Ok(Self::Value { from, to })
+	}
+}
+
+/// Build a `ValueValidation` error through clap's machinery, so that it names the flag, echoes the
+/// offending value, and is rendered (and terminated) by clap's formatter.
+fn invalid_signal_mapping(
+	cmd: &Command,
+	arg: Option<&Arg>,
+	value: &OsStr,
+	reason: String,
+) -> clap::error::Error {
+	let mut err = clap::error::Error::new(ErrorKind::ValueValidation).with_cmd(cmd);
+	err.insert(
+		ContextKind::InvalidArg,
+		ContextValue::String(arg.map_or_else(
+			|| "--map-signal <SIGNAL:SIGNAL>".into(),
+			ToString::to_string,
+		)),
+	);
+	err.insert(
+		ContextKind::InvalidValue,
+		ContextValue::String(value.to_string_lossy().into_owned()),
+	);
+	err.insert(
+		ContextKind::Suggested,
+		ContextValue::StyledStrs(vec![reason.into()]),
+	);
+	err
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	fn parse_map_signal(value: &str) -> Result<Vec<SignalMapping>, String> {
+		super::super::Args::command()
+			.try_get_matches_from(["watchexec", "--map-signal", value, "true"])
+			.map(|matches| {
+				matches
+					.get_many::<SignalMapping>("signal_map")
+					.into_iter()
+					.flatten()
+					.copied()
+					.collect()
+			})
+			.map_err(|err| err.render().to_string())
+	}
+
+	#[test]
+	fn valid_signal_mapping_parses() {
+		let mappings = parse_map_signal("TERM:INT").expect("TERM:INT should parse");
+		assert_eq!(mappings.len(), 1);
+		assert_eq!(mappings[0].from, Signal::Terminate);
+		assert_eq!(mappings[0].to, Some(Signal::Interrupt));
+
+		let mappings = parse_map_signal("TERM:").expect("TERM: should parse");
+		assert_eq!(mappings.len(), 1);
+		assert_eq!(mappings[0].from, Signal::Terminate);
+		assert_eq!(mappings[0].to, None);
+	}
+
+	#[test]
+	fn invalid_signal_mapping_errors_name_the_flag_and_the_value() {
+		for (value, reason) in [
+			("FOO", "missing ':' separator"),
+			(":TERM", "invalid signal to map from ('')"),
+			("TERM:FOO", "invalid signal to map to ('FOO')"),
+		] {
+			let err = parse_map_signal(value).expect_err("should not parse");
+			assert!(
+				err.contains("--map-signal"),
+				"error for {value:?} should name the flag: {err:?}"
+			);
+			assert!(
+				err.contains(&format!("'{value}'")),
+				"error for {value:?} should echo the value: {err:?}"
+			);
+			assert!(
+				err.contains(reason),
+				"error for {value:?} should explain the problem: {err:?}"
+			);
+			assert!(
+				err.ends_with('\n'),
+				"error for {value:?} should end with a newline: {err:?}"
+			);
+		}
 	}
 }

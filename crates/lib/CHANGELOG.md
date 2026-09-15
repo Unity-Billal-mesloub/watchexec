@@ -1,6 +1,39 @@
 # Changelog
 
 ## Next (YYYY-MM-DD)
+## v8.4.2 (2026-09-15)
+## v8.4.1 (2026-09-03)
+## v8.4.0 (2026-08-24)
+- Add `Filterer::check_dir` and Watchexec-owned, source-filtered recursion for Inotify, Windows ReadDirectoryChanges, and Poll backends.
+- Reconcile managed filesystem sources when roots, watcher selection, symlink policy, or the live filterer changes. `fs_ready` now reports settled reconciliation and may signal after partial nonfatal failures.
+- Continue traversing independent sibling paths after a scan or watch failure, reporting the failure through the runtime error hook.
+- Classify and latch watch or handle exhaustion so it is reported once per reconciliation rather than once per path.
+- For managed recursion, watch the nearest safe existing ancestor of a missing root so the root can be watched when it is created.
+- Apply source-directory filtering to events from `FSEvents` without rebuilding its shared stream.
+- Keep explicitly watched files watched across repeated replacement on macOS.
+- If Notify recommends Kqueue, Watchexec uses Poll instead because Kqueue filesystem watching is resource-intensive and its non-recursive semantics are not reliable enough.
+
+## v8.3.0 (2026-08-22)
+
+- propagate Unix job-control signals
+- drop events gracefully when channel is full ([#920](https://github.com/watchexec/watchexec/pull/920)) ([#1081](https://github.com/watchexec/watchexec/pull/1081))
+- quit on Terminate in home page example
+- upgrade to nix 0.31 ([#1016](https://github.com/watchexec/watchexec/pull/1016))
+
+## v8.2.0 (2026-03-02)
+
+- Feat: add `fs_ready` signal for watcher readiness ([#1024](https://github.com/watchexec/watchexec/pull/1024))
+
+## v8.1.2 (2026-02-24)
+
+## v8.1.1 (2026-02-22)
+
+- Fix: bug on macOS where a task in the keyboard events worker would hang after graceful quit ([#1018](https://github.com/watchexec/watchexec/pull/1018))
+
+## v8.1.0 (2026-02-22)
+
+- Augments `keyboard_events` config to emit events for all single keyboard key inputs, in addition to the existing EOF
+- `keyboard_events` now switches to raw mode (and disabling it switches back to cooked)
 
 ## v8.0.1 (2025-05-15)
 

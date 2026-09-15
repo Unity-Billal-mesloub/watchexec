@@ -1,6 +1,14 @@
 # Changelog
 
 ## Next (YYYY-MM-DD)
+## v5.1.1 (2026-08-24)
+## v5.1.0 (2026-08-22)
+
+- propagate Unix job-control signals
+- add first-class SIGSTOP etc
+- adopt release-plz
+- upgrade to nix 0.31 ([#1016](https://github.com/watchexec/watchexec/pull/1016))
+- opt some crates into 3 targets for docsrs
 
 ## v5.0.1 (2026-01-20)
 
@@ -22,6 +30,7 @@
 ## v2.1.0 (2023-12-09)
 
 - Derive `Hash` for `Signal`.
+- Add `Continue`, `Suspend`, and `TerminalSuspend` as first-class signals.
 
 ## v2.0.0 (2023-11-29)
 

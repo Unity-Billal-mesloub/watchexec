@@ -1,6 +1,24 @@
 # Changelog
 
 ## Next (YYYY-MM-DD)
+## v5.4.0 (2026-09-03)
+- Add a child spawn function for supervising processes created by external launchers.
+
+## v5.3.1 (2026-08-24)
+## v5.3.0 (2026-08-22)
+
+- Fix: exec-replace safe shell commands to fix restart racing the old process
+- Feat: add "quoted" option to allow opting in to or out of quoting of command and arguments to allow Windows shells such as cmd and PowerShell to work correctly while also allowing git-bash and Nushell to work on Windows
+- Deps: nix 0.31 ([#1016](https://github.com/watchexec/watchexec/pull/1016))
+- Docs: opt into 3 targets for docsrs
+
+## v5.2.0 (2026-03-09)
+
+- Add the ability to use `spawn_with` from process-wrap (#1013)
+
+## v5.1.0 (2026-02-22)
+
+- Add `is_running()` and clarify what `is_dead()` is measuring
 
 ## v5.0.2 (2026-01-20)
 

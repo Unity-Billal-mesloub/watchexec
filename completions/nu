@@ -24,6 +24,10 @@ module completions {
     [ "clear" "reset" ]
   }
 
+  def "nu-complete watchexec notify" [] {
+    [ "both" "start" "end" ]
+  }
+
   def "nu-complete watchexec color" [] {
     [ "auto" "always" "never" ]
   }
@@ -42,15 +46,19 @@ module completions {
     --wrap-process: string@"nu-complete watchexec wrap_process" # Configure how the process is wrapped
     --stop-signal: string     # Signal to send to stop the command
     --stop-timeout: string    # Time to wait for the command to exit gracefully
+    --timeout: string         # Kill the command if it runs longer than this duration
     --delay-run: string       # Sleep before running the command
-    --workdir: path           # Set the working directory
+    --workdir: directory      # Set the working directory
     --socket: string          # Provide a socket to the command
+    --quote(-Q)               # Set whether or not to quote the command symbols when passing them to the shell
     --on-busy-update(-o): string@"nu-complete watchexec on_busy_update" # What to do when receiving events while the command is running
     --restart(-r)             # Restart the process if it's still running
     --signal(-s): string      # Send a signal to the process when it's still running
     --map-signal: string      # Translate signals from the OS to signals to send to the command
     --debounce(-d): string    # Time to wait for new events before taking action
     --stdin-quit              # Exit when stdin closes
+    --interactive(-I)         # Respond to keypresses to quit, restart, stop, or pause
+    --exit-on-error           # Exit when the command has an error
     --postpone(-p)            # Wait until first change before running command
     --poll: string            # Poll for filesystem changes
     --emit-events-to: string@"nu-complete watchexec emit_events_to" # Configure event emission
@@ -66,17 +74,18 @@ module completions {
     --exts(-e): string        # Filename extensions to filter to
     --filter(-f): string      # Filename patterns to filter to
     --filter-file: path       # Files to load filters from
-    --project-origin: path    # Set the project origin
+    --project-origin: directory # Set the project origin
     --filter-prog(-j): string # Filter programs
     --ignore(-i): string      # Filename patterns to filter out
     --ignore-file: path       # Files to load ignores from
     --fs-events: string@"nu-complete watchexec filter_fs_events" # Filesystem events to filter to
     --no-meta                 # Don't emit fs events for metadata changes
+    --no-follow-symlinks      # Don't follow directory symlinks when watching
     --verbose(-v)             # Set diagnostic log level
     --log-file: path          # Write diagnostic logs to a file
     --print-events            # Print events that trigger actions
     --clear(-c): string@"nu-complete watchexec screen_clear" # Clear screen before running command
-    --notify(-N)              # Alert when commands start and end
+    --notify(-N): string@"nu-complete watchexec notify" # Alert when commands start and end
     --color: string@"nu-complete watchexec color" # When to use terminal colours
     --timings                 # Print how long the command took to run
     --quiet(-q)               # Don't print starting and stopping messages

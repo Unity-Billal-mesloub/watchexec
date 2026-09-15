@@ -6,6 +6,9 @@ use process_wrap::tokio::CommandWrap;
 use tracing::trace;
 use watchexec_events::ProcessEnd;
 
+#[cfg(not(test))]
+use super::task::Spawner;
+use super::task::SpawnerSlot;
 use crate::command::Command;
 
 /// The state of the job's command / process.
@@ -72,10 +75,11 @@ impl CommandState {
 	}
 
 	#[cfg_attr(test, allow(unused_mut, unused_variables))]
-	pub(crate) fn spawn(
+	pub(super) fn spawn(
 		&mut self,
 		command: Arc<Command>,
 		mut spawnable: CommandWrap,
+		spawner: &SpawnerSlot,
 	) -> std::io::Result<bool> {
 		if let Self::Running { .. } = self {
 			trace!("command running, not spawning again");
@@ -88,7 +92,11 @@ impl CommandState {
 		let child = super::TestChild::new(command)?;
 
 		#[cfg(not(test))]
-		let child = spawnable.spawn()?;
+		let child = match spawner.get() {
+			Spawner::Default => spawnable.spawn()?,
+			Spawner::Command(f) => spawnable.spawn_with(|cmd| f(cmd))?,
+			Spawner::Child(f) => f(spawnable)?,
+		};
 
 		*self = Self::Running {
 			child,

@@ -1,6 +1,6 @@
 [package]
 name = "watchexec-cli"
-version = "2.3.3"
+version = "2.7.3"
 
 authors = ["Félix Saparelli <felix@passcod.name>", "Matt Green <mattgreenrocks@gmail.com>"]
 license = "Apache-2.0"
@@ -28,7 +28,7 @@ chrono = "0.4.31"
 clap_complete = "4.5.44"
 clap_complete_nushell = "4.4.2"
 clap_mangen = "0.2.15"
-clearscreen = "4.0.1"
+clearscreen = "4.0.4"
 dashmap = "6.1.0"
 dirs = "6.0.0"
 dunce = "1.0.4"
@@ -65,7 +65,7 @@ features = ["log", "env_logger"]
 optional = true
 
 [dependencies.ignore-files]
-version = "3.0.5"
+version = "3.0.7"
 path = "../ignore-files"
 
 [dependencies.miette]
@@ -77,24 +77,24 @@ version = "0.1.1"
 optional = true
 
 [dependencies.project-origins]
-version = "1.4.2"
+version = "1.4.4"
 path = "../project-origins"
 
 [dependencies.watchexec]
-version = "8.0.1"
+version = "8.4.2"
 path = "../lib"
 
 [dependencies.watchexec-events]
-version = "6.0.0"
+version = "6.1.2"
 path = "../events"
 features = ["serde"]
 
 [dependencies.watchexec-signals]
-version = "5.0.1"
+version = "5.1.1"
 path = "../signals"
 
 [dependencies.watchexec-filterer-globset]
-version = "8.0.0"
+version = "8.0.4"
 path = "../filterer/globset"
 
 [dependencies.tokio]
@@ -122,7 +122,7 @@ features = [
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2.74"
-nix = { version = "0.30.1", features = ["net"] }
+nix = { version = "0.31.1", features = ["net"] }
 
 [target.'cfg(windows)'.dependencies]
 socket2 = "0.6.1"
@@ -136,7 +136,7 @@ mimalloc = "0.1.39"
 embed-resource = "3.0.1"
 
 [build-dependencies.bosion]
-version = "2.0.0"
+version = "2.0.2"
 path = "../bosion"
 
 [dev-dependencies]
@@ -165,6 +165,9 @@ bin-dir = "watchexec-{ version }-{ target }/{ bin }{ binary-ext }"
 pkg-fmt = "txz"
 
 [package.metadata.binstall.overrides.x86_64-pc-windows-msvc]
+pkg-fmt = "zip"
+
+[package.metadata.binstall.overrides.aarch64-pc-windows-msvc]
 pkg-fmt = "zip"
 
 [package.metadata.deb]

@@ -1,6 +1,6 @@
 [package]
 name = "watchexec-events"
-version = "6.0.0"
+version = "6.1.2"
 
 authors = ["Félix Saparelli <felix@passcod.name>"]
 license = "Apache-2.0 OR MIT"
@@ -24,12 +24,12 @@ optional = true
 features = ["derive"]
 
 [dependencies.watchexec-signals]
-version = "5.0.1"
+version = "5.1.1"
 path = "../signals"
 default-features = false
 
 [dev-dependencies]
-snapbox = "0.6.18"
+snapbox = "1.2.1"
 serde_json = "1.0.107"
 
 [features]

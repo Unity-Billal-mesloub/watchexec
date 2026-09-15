@@ -5,7 +5,7 @@ pub use self::{
 	job::Job,
 	messages::{Control, Ticket},
 	state::CommandState,
-	task::JobTaskContext,
+	task::{JobTaskContext, SpawnChildFn, SpawnFn},
 };
 
 #[cfg(test)]

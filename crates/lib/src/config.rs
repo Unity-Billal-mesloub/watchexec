@@ -1,8 +1,8 @@
 //! Configuration and builders for [`crate::Watchexec`].
 
-use std::{future::Future, pin::pin, sync::Arc, time::Duration};
+use std::{future::Future, time::Duration};
 
-use tokio::sync::Notify;
+use tokio::sync::watch;
 use tracing::{debug, trace};
 
 use crate::{
@@ -30,9 +30,9 @@ use crate::{
 #[derive(Clone, Debug)]
 #[non_exhaustive]
 pub struct Config {
-	/// This is set by the change methods whenever they're called, and notifies Watchexec that it
-	/// should read the configuration again.
-	pub(crate) change_signal: Arc<Notify>,
+	/// This monotonic revision is incremented by the change methods whenever they're called, and
+	/// notifies Watchexec that it should read the configuration again.
+	pub(crate) change_signal: watch::Sender<u64>,
 
 	/// The main handler to define: what to do when an action is triggered.
 	///
@@ -110,18 +110,39 @@ pub struct Config {
 	///
 	/// If this is non-empty, the filesystem event source is started and configured to provide
 	/// events for these paths. If it becomes empty, the filesystem event source is shut down.
+	///
+	/// Watched paths are themselves never filtered.
 	pub pathset: Changeable<Vec<WatchedPath>>,
 
 	/// The kind of filesystem watcher to be used.
 	pub file_watcher: Changeable<Watcher>,
 
+	/// Whether to follow directory symlinks when watching paths.
+	///
+	/// When enabled, directory symlink targets are included in recursive watches where supported.
+	/// Native macOS filesystem watching does not follow directory symlinks outside the watched
+	/// hierarchy.
+	pub follow_symlinks: Changeable<bool>,
+
+	/// Listen for Unix job-control signals (`SIGTSTP` and `SIGCONT`).
+	///
+	/// This is disabled by default because installing a `SIGTSTP` listener suppresses the operating
+	/// system's default suspend behaviour. Applications which enable this must suspend themselves
+	/// after handling the emitted [`Signal::TerminalSuspend`](watchexec_signals::Signal) event.
+	///
+	/// This has no effect on non-Unix platforms. It is unchangeable at runtime and must be set
+	/// before Watchexec instantiation because Unix signal dispositions cannot be restored after a
+	/// Tokio signal listener is installed.
+	pub signal_job_control: bool,
+
 	/// Watch stdin and emit events when input comes in over the keyboard.
 	///
-	/// If this is true, the keyboard event source is started and configured to report when input
-	/// is received on stdin. If it becomes false, the keyboard event source is shut down and stdin
+	/// If this is true, the keyboard event source is started and stdin is switched to raw mode
+	/// (disabling line buffering). Individual key events are emitted, as well as EOF. If it
+	/// becomes false, the keyboard event source is shut down, cooked mode is restored, and stdin
 	/// may flow to commands again.
 	///
-	/// Currently only EOF is watched for and emitted.
+	/// This requires a TTY and is opt-in.
 	pub keyboard_events: Changeable<bool>,
 
 	/// How long to wait for events to build up before executing an action.
@@ -133,9 +154,9 @@ pub struct Config {
 	/// Default is 50ms.
 	pub throttle: Changeable<Duration>,
 
-	/// The filterer implementation to use when filtering events.
+	/// The filterer implementation used for event and source-directory filtering.
 	///
-	/// The default is a no-op, which will always pass every event.
+	/// The default is a no-op, which passes every event and directory.
 	pub filterer: ChangeableFilterer,
 
 	/// The buffer size of the channel which carries runtime errors.
@@ -153,21 +174,29 @@ pub struct Config {
 	///
 	/// This is unchangeable at runtime and must be set before Watchexec instantiation.
 	pub event_channel_size: usize,
+
+	/// Signalled by the filesystem worker after it settles reconciliation for an observed config
+	/// revision. Subscribe via [`Config::fs_ready()`] before changing filesystem configuration to
+	/// avoid missing or misattributing the notification.
+	pub(crate) fs_ready: watch::Sender<()>,
 }
 
 impl Default for Config {
 	fn default() -> Self {
 		Self {
-			change_signal: Default::default(),
+			change_signal: watch::channel(0).0,
 			action_handler: ChangeableFn::new(ActionReturn::Sync),
 			error_handler: Default::default(),
 			pathset: Default::default(),
 			file_watcher: Default::default(),
+			follow_symlinks: Changeable::new(true),
+			signal_job_control: false,
 			keyboard_events: Default::default(),
 			throttle: Changeable::new(Duration::from_millis(50)),
 			filterer: Default::default(),
 			error_channel_size: 64,
 			event_channel_size: 4096,
+			fs_ready: watch::channel(()).0,
 		}
 	}
 }
@@ -182,7 +211,11 @@ impl Config {
 		reason = "this return can explicitly be ignored"
 	)]
 	pub fn signal_change(&self) -> &Self {
-		self.change_signal.notify_waiters();
+		self.change_signal.send_modify(|revision| {
+			*revision = revision
+				.checked_add(1)
+				.expect("configuration revision overflow");
+		});
 		self
 	}
 
@@ -192,7 +225,21 @@ impl Config {
 	/// subsequent one is from a change signal for this Config.
 	#[must_use]
 	pub(crate) fn watch(&self) -> ConfigWatched {
-		ConfigWatched::new(self.change_signal.clone())
+		ConfigWatched::new(self.change_signal.subscribe())
+	}
+
+	/// Subscribe to filesystem worker readiness notifications.
+	///
+	/// The receiver is notified after the filesystem worker finishes applying the latest observed
+	/// configuration.
+	///
+	/// Path-specific failures are reported through the error handler and do not prevent readiness.
+	///
+	/// Notifications carry no configuration revision and may be coalesced. To wait for a change,
+	/// subscribe before making it, then call `.changed().await`.
+	#[must_use]
+	pub fn fs_ready(&self) -> watch::Receiver<()> {
+		self.fs_ready.subscribe()
 	}
 
 	/// Set the pathset to be watched.
@@ -211,6 +258,13 @@ impl Config {
 	pub fn file_watcher(&self, watcher: Watcher) -> &Self {
 		debug!(?watcher, "Config: file watcher");
 		self.file_watcher.replace(watcher);
+		self.signal_change()
+	}
+
+	/// Set whether symlinks are followed when watching paths.
+	pub fn follow_symlinks(&self, follow: bool) -> &Self {
+		debug!(?follow, "Config: follow symlinks");
+		self.follow_symlinks.replace(follow);
 		self.signal_change()
 	}
 
@@ -272,33 +326,78 @@ impl Config {
 #[derive(Debug)]
 pub(crate) struct ConfigWatched {
 	first_run: bool,
-	notify: Arc<Notify>,
+	revision: watch::Receiver<u64>,
 }
 
 impl ConfigWatched {
-	fn new(notify: Arc<Notify>) -> Self {
-		let notified = notify.notified();
-		pin!(notified).as_mut().enable();
-
+	const fn new(revision: watch::Receiver<u64>) -> Self {
 		Self {
 			first_run: true,
-			notify,
+			revision,
 		}
 	}
 
-	pub async fn next(&mut self) {
-		let notified = self.notify.notified();
-		let mut notified = pin!(notified);
-		notified.as_mut().enable();
-
+	pub async fn next(&mut self) -> u64 {
 		if self.first_run {
-			trace!("ConfigWatched: first run");
+			let revision = *self.revision.borrow_and_update();
+			trace!(revision, "ConfigWatched: first run");
 			self.first_run = false;
+			revision
 		} else {
-			trace!(?notified, "ConfigWatched: waiting for change");
-			// there's a bit of a gotcha where any config changes made after a Notified resolves
-			// but before a new one is issued will not be caught. not sure how to fix that yet.
-			notified.await;
+			trace!("ConfigWatched: waiting for change");
+			self.revision
+				.changed()
+				.await
+				.expect("configuration change sender dropped");
+			let revision = *self.revision.borrow_and_update();
+			trace!(revision, "ConfigWatched: changed");
+			revision
 		}
+	}
+
+	/// Whether a revision is already waiting to be observed.
+	///
+	/// Filesystem recursion uses this before every bounded state-machine step so
+	/// an obsolete reconciliation cannot advance into its destructive sweep.
+	pub fn pending(&self) -> bool {
+		self.first_run
+			|| self
+				.revision
+				.has_changed()
+				.expect("configuration change sender dropped")
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use futures::FutureExt as _;
+
+	use super::Config;
+
+	#[test]
+	fn config_watch_first_run_is_immediate() {
+		let config = Config::default();
+		let mut watched = config.watch();
+
+		assert_eq!(watched.next().now_or_never(), Some(0));
+	}
+
+	#[test]
+	fn config_watch_waits_after_first_run() {
+		let config = Config::default();
+		let mut watched = config.watch();
+
+		assert!(watched.next().now_or_never().is_some());
+		assert!(watched.next().now_or_never().is_none());
+	}
+
+	#[test]
+	fn config_watch_observes_change_between_calls() {
+		let config = Config::default();
+		let mut watched = config.watch();
+
+		assert_eq!(watched.next().now_or_never(), Some(0));
+		config.signal_change();
+		assert_eq!(watched.next().now_or_never(), Some(1));
 	}
 }
