@@ -1,4 +1,4 @@
-[![CI status on main branch](https://github.com/watchexec/watchexec/actions/workflows/tests.yml/badge.svg)](https://github.com/watchexec/watchexec/actions/workflows/tests.yml)
+[![CI status on main branch](https://github.com/Unity-Billal-mesloub/watchexec/actions/workflows/tests.yml/badge.svg)](https://github.com/Unity-Billal-mesloub/watchexec/actions/workflows/tests.yml)
 
 # Watchexec
 
@@ -44,7 +44,7 @@ More usage examples: [in the CLI README](./crates/cli/#usage-examples)!
 
 - With [your package manager](./doc/packages.md) for Arch, Debian, Homebrew, Nix, Scoop, Chocolatey…
 - From binary with [Binstall](https://github.com/cargo-bins/cargo-binstall): `cargo binstall watchexec-cli` <!-- this line does NOT contain a typo -->
-- As [pre-built binary package from Github](https://github.com/watchexec/watchexec/releases/latest)
+- As [pre-built binary package from Github](https://github.com/Unity-Billal-mesloub/watchexec/releases/latest)
 - From source with Cargo: `cargo install --locked watchexec-cli`
 
 All options in detail: [in the CLI README](./crates/cli/#installation),
@@ -56,9 +56,9 @@ and [in the manual page](./doc/watchexec.1.md).
 
 Watchexec pairs well with:
 
-- [checkexec](https://github.com/kurtbuilds/checkexec): to run only when source files are newer than a target file
-- [just](https://github.com/casey/just): a modern alternative to `make`
-- [systemfd](https://github.com/mitsuhiko/systemfd): socket-passing in development
+- [checkexec](https://github.com/Unity-Billal-mesloub/checkexec): to run only when source files are newer than a target file
+- [just](https://github.com/Unity-Billal-mesloub/just): a modern alternative to `make`
+- [systemfd](https://github.com/Unity-Billal-mesloub/systemfd): socket-passing in development
 
 ## Extend
 
@@ -66,20 +66,7 @@ Watchexec pairs well with:
   - [watchexec-events](./crates/events/): event types for watchexec.
   - [watchexec-signals](./crates/signals/): signal types for watchexec.
   - [watchexec-supervisor](./crates/supervisor/): process lifecycle manager (the _exec_ part of watchexec).
-- [clearscreen](https://github.com/watchexec/clearscreen): to clear the (terminal) screen on every platform.
-- [process wrap](https://github.com/watchexec/process-wrap): to run commands in process groups.
 - [ignore files](./crates/ignore-files/): to find, parse, and interpret ignore files.
 - [project origins](./crates/project-origins/): to find the origin(s) directory of a project.
-- [notify](https://github.com/notify-rs/notify): to respond to file modifications (third-party).
 
-### Downstreams
 
-Selected downstreams of watchexec and associated crates:
-
-- ~~[cargo watch](https://github.com/watchexec/cargo-watch): a specialised watcher for Rust/Cargo projects.~~
-- [cargo lambda](https://github.com/cargo-lambda/cargo-lambda): a dev tool for Rust-powered AWS Lambda functions.
-- [create-rust-app](https://create-rust-app.dev): a template for Rust+React web apps.
-- [devenv.sh](https://github.com/cachix/devenv): a developer environment with nix-based declarative configs.
-- [dotter](https://github.com/supercuber/dotter): a dotfile manager.
-- [ghciwatch](https://github.com/mercurytechnologies/ghciwatch): a specialised watcher for Haskell projects.
-- [tectonic](https://tectonic-typesetting.github.io/book/latest/): a TeX/LaTeX typesetting system.
